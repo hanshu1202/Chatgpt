@@ -3,7 +3,6 @@ const fs = require("fs");
 
 const START_URL = process.env.START_URL;
 const MAX_CHAPTERS = parseInt(process.env.MAX_CHAPTERS || "1000");
-const COOKIES = JSON.parse(process.env.TOMATO_COOKIES);
 
 if (!START_URL) {
     throw new Error("START_URL missing");
@@ -23,7 +22,24 @@ if (!START_URL) {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     });
 
-    await context.addCookies(COOKIES);
+    // ===== COOKIE FIX =====
+    const rawCookies = JSON.parse(process.env.TOMATO_COOKIES || "[]");
+
+    const cookies = rawCookies
+        .filter(c => c.name && c.value)
+        .map(c => ({
+            name: c.name,
+            value: c.value,
+            domain: ".tomatomtl.com",
+            path: "/",
+            secure: true,
+            httpOnly: !!c.httpOnly
+        }));
+
+    console.log(`Loaded ${cookies.length} cookies`);
+
+    await context.addCookies(cookies);
+    // ======================
 
     const page = await context.newPage();
 
