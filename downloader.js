@@ -22,7 +22,6 @@ if (!START_URL) {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     });
 
-    // Load cookies from GitHub Secret
     const rawCookies = JSON.parse(process.env.TOMATO_COOKIES || "[]");
 
     const cookies = rawCookies
@@ -62,37 +61,51 @@ if (!START_URL) {
                 timeout: 120000
             });
         } catch (err) {
-            console.log("Navigation timeout, continuing anyway...");
+            console.log("Navigation timeout:", err.message);
         }
 
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(8000);
 
         await page.screenshot({
             path: `debug-${i}.png`,
             fullPage: true
         });
 
-        try {
-            await page.waitForSelector(
-                "#chapter_content span.kxa",
-                {
-                    timeout: 30000
-                }
-            );
-        } catch (err) {
-            console.log("Chapter content not found");
+        const html = await page.content();
+        fs.writeFileSync(`debug-${i}.html`, html);
 
-            await page.screenshot({
-                path: `failed-${i}.png`,
-                fullPage: true
-            });
+        const spanCount = await page.evaluate(() => {
+            return document.querySelectorAll(
+                "#chapter_content span.kxa"
+            ).length;
+        }).catch(() => 0);
+
+        console.log("span.kxa count:", spanCount);
+
+        if (spanCount === 0) {
+
+            console.log("No chapter content found.");
+
+            const pageTitle = await page.title().catch(() => "");
+            console.log("Page title:", pageTitle);
 
             fs.writeFileSync(
-                `failed-${i}.html`,
-                await page.content()
+                "FAILED.txt",
+                `No chapter content found
+
+URL:
+${currentUrl}
+
+TITLE:
+${pageTitle}
+
+SPAN COUNT:
+${spanCount}
+`
             );
 
-            throw err;
+            await browser.close();
+            process.exit(1);
         }
 
         const title = await page.evaluate(() => {
@@ -115,7 +128,7 @@ if (!START_URL) {
                     .join("\n\n")
         );
 
-        console.log(`Saved: ${title}`);
+        console.log("Saved:", title);
 
         chapters.push(
 `============================================================
@@ -127,24 +140,22 @@ ${content}
         );
 
         const nextUrl = await page.evaluate(() => {
-            const nextBtn = document.querySelector(
+            const btn = document.querySelector(
                 "a.nav-button.next"
             );
 
-            return nextBtn ? nextBtn.href : null;
+            return btn ? btn.href : null;
         });
 
         console.log("Next URL:", nextUrl);
 
-        if (!nextUrl) {
-            console.log("No next chapter found");
+        if (!nextUrl)
             break;
-        }
 
         currentUrl = nextUrl;
 
         await page.waitForTimeout(
-            1500 + Math.floor(Math.random() * 2500)
+            2000 + Math.floor(Math.random() * 3000)
         );
     }
 
