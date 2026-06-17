@@ -22,7 +22,7 @@ if (!START_URL) {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     });
 
-    // ===== COOKIE FIX =====
+    // Load cookies from GitHub Secret
     const rawCookies = JSON.parse(process.env.TOMATO_COOKIES || "[]");
 
     const cookies = rawCookies
@@ -39,7 +39,6 @@ if (!START_URL) {
     console.log(`Loaded ${cookies.length} cookies`);
 
     await context.addCookies(cookies);
-    // ======================
 
     const page = await context.newPage();
 
@@ -57,22 +56,44 @@ if (!START_URL) {
 
         console.log("Opening:", currentUrl);
 
-        await page.goto(currentUrl, {
-            waitUntil: "networkidle",
-            timeout: 120000
-        });
+        try {
+            await page.goto(currentUrl, {
+                waitUntil: "load",
+                timeout: 120000
+            });
+        } catch (err) {
+            console.log("Navigation timeout, continuing anyway...");
+        }
+
+        await page.waitForTimeout(5000);
 
         await page.screenshot({
             path: `debug-${i}.png`,
             fullPage: true
         });
 
-        await page.waitForSelector(
-            "#chapter_content span.kxa",
-            {
-                timeout: 60000
-            }
-        );
+        try {
+            await page.waitForSelector(
+                "#chapter_content span.kxa",
+                {
+                    timeout: 30000
+                }
+            );
+        } catch (err) {
+            console.log("Chapter content not found");
+
+            await page.screenshot({
+                path: `failed-${i}.png`,
+                fullPage: true
+            });
+
+            fs.writeFileSync(
+                `failed-${i}.html`,
+                await page.content()
+            );
+
+            throw err;
+        }
 
         const title = await page.evaluate(() => {
             return (
@@ -94,7 +115,7 @@ if (!START_URL) {
                     .join("\n\n")
         );
 
-        console.log("Saved:", title);
+        console.log(`Saved: ${title}`);
 
         chapters.push(
 `============================================================
@@ -106,15 +127,17 @@ ${content}
         );
 
         const nextUrl = await page.evaluate(() => {
-            const btn = document.querySelector(
+            const nextBtn = document.querySelector(
                 "a.nav-button.next"
             );
 
-            return btn ? btn.href : null;
+            return nextBtn ? nextBtn.href : null;
         });
 
+        console.log("Next URL:", nextUrl);
+
         if (!nextUrl) {
-            console.log("No next chapter found.");
+            console.log("No next chapter found");
             break;
         }
 
