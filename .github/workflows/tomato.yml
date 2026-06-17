@@ -46,8 +46,10 @@ jobs:
           name: novel
           path: novel.txt
 
-      - name: Upload Debug Screenshots
+      - name: Upload Debug Files
         uses: actions/upload-artifact@v4
         with:
-          name: screenshots
-          path: debug-*.png
+          name: debug
+          path: |
+            *.png
+            *.html
