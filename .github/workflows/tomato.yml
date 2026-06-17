@@ -1,0 +1,53 @@
+name: TomatoMTL Downloader
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_url:
+        description: First chapter URL
+        required: true
+        type: string
+
+      max_chapters:
+        description: Maximum chapters
+        required: false
+        default: "500"
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright Browser
+        run: npx playwright install chromium
+
+      - name: Download Chapters
+        env:
+          START_URL: ${{ github.event.inputs.start_url }}
+          MAX_CHAPTERS: ${{ github.event.inputs.max_chapters }}
+          TOMATO_COOKIES: ${{ secrets.TOMATO_COOKIES }}
+        run: node downloader.js
+
+      - name: Upload Novel
+        uses: actions/upload-artifact@v4
+        with:
+          name: novel
+          path: novel.txt
+
+      - name: Upload Debug Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: debug-*.png
