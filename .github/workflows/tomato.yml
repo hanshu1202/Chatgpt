@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       start_url:
-        description: First chapter URL
+        description: "First chapter URL"
         required: true
         type: string
 
       max_chapters:
-        description: Maximum chapters
+        description: "Maximum chapters to download"
         required: false
-        default: "500"
+        default: "1"
         type: string
 
 jobs:
@@ -19,36 +19,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm install
 
       - name: Install Playwright Browser
         run: npx playwright install chromium
 
-      - name: Download Chapters
-        env:
-          START_URL: ${{ github.event.inputs.start_url }}
-          MAX_CHAPTERS: ${{ github.event.inputs.max_chapters }}
-          TOMATO_COOKIES: ${{ secrets.TOMATO_COOKIES }}
-        run: node downloader.js
-
-            - name: Download Chapters
-        env:
-          START_URL: ${{ github.event.inputs.start_url }}
-          MAX_CHAPTERS: ${{ github.event.inputs.max_chapters }}
-          TOMATO_COOKIES: ${{ secrets.TOMATO_COOKIES }}
-        run: node downloader.js
+      - name: Run Downloader
         continue-on-error: true
+        env:
+          START_URL: ${{ github.event.inputs.start_url }}
+          MAX_CHAPTERS: ${{ github.event.inputs.max_chapters }}
+          TOMATO_COOKIES: ${{ secrets.TOMATO_COOKIES }}
+        run: node downloader.js
 
-      - name: Upload Everything
+      - name: Upload Debug Files
         if: always()
         uses: actions/upload-artifact@v4
         with:
