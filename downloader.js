@@ -53,7 +53,7 @@ if (!START_URL) {
 
         visited.add(currentUrl);
 
-        console.log("Opening:", currentUrl);
+        console.log(`\nOpening: ${currentUrl}`);
 
         try {
             await page.goto(currentUrl, {
@@ -61,47 +61,73 @@ if (!START_URL) {
                 timeout: 120000
             });
         } catch (err) {
-            console.log("Navigation timeout:", err.message);
+            console.log("Navigation warning:", err.message);
         }
 
-        await page.waitForTimeout(8000);
+        await page.waitForTimeout(20000);
 
         await page.screenshot({
             path: `debug-${i}.png`,
             fullPage: true
         });
 
-        const html = await page.content();
-        fs.writeFileSync(`debug-${i}.html`, html);
+        fs.writeFileSync(
+            `debug-${i}.html`,
+            await page.content(),
+            "utf8"
+        );
 
-        const spanCount = await page.evaluate(() => {
-            return document.querySelectorAll(
-                "#chapter_content span.kxa"
-            ).length;
-        }).catch(() => 0);
+        console.log("Waiting for chapter content...");
 
-        console.log("span.kxa count:", spanCount);
+        try {
+            await page.waitForFunction(() => {
+                const content =
+                    document.querySelector("#chapter_content");
 
-        if (spanCount === 0) {
+                if (!content)
+                    return false;
 
-            console.log("No chapter content found.");
+                if (
+                    content.querySelector(".placeholder")
+                )
+                    return false;
 
-            const pageTitle = await page.title().catch(() => "");
-            console.log("Page title:", pageTitle);
+                return (
+                    content.innerText.trim().length > 500
+                );
+            }, {
+                timeout: 120000
+            });
+        } catch (err) {
+
+            console.log("Content never loaded");
+
+            const title = await page.title();
 
             fs.writeFileSync(
                 "FAILED.txt",
-                `No chapter content found
-
+                `
 URL:
 ${currentUrl}
 
 TITLE:
-${pageTitle}
+${title}
 
-SPAN COUNT:
-${spanCount}
-`
+REASON:
+Chapter content did not load within timeout.
+`,
+                "utf8"
+            );
+
+            await page.screenshot({
+                path: "failed.png",
+                fullPage: true
+            });
+
+            fs.writeFileSync(
+                "failed.html",
+                await page.content(),
+                "utf8"
             );
 
             await browser.close();
@@ -110,25 +136,42 @@ ${spanCount}
 
         const title = await page.evaluate(() => {
             return (
-                document.querySelector("h1")?.textContent?.trim() ||
+                document.querySelector("h1")
+                    ?.textContent
+                    ?.trim() ||
                 document.title
             );
         });
 
-        const content = await page.$$eval(
-            "#chapter_content span.kxa",
-            spans =>
-                spans
+        const content = await page.evaluate(() => {
+            const spans = document.querySelectorAll(
+                "#chapter_content span.kxa"
+            );
+
+            if (spans.length > 0) {
+                return [...spans]
                     .map(
                         s =>
                             s.getAttribute("transtext") ||
                             s.textContent ||
                             ""
                     )
-                    .join("\n\n")
-        );
+                    .join("\n\n");
+            }
 
-        console.log("Saved:", title);
+            const contentDiv =
+                document.querySelector(
+                    "#chapter_content"
+                );
+
+            return contentDiv
+                ? contentDiv.innerText
+                : "";
+        });
+
+        console.log(
+            `Content length: ${content.length}`
+        );
 
         chapters.push(
 `============================================================
@@ -144,18 +187,27 @@ ${content}
                 "a.nav-button.next"
             );
 
-            return btn ? btn.href : null;
+            return btn
+                ? btn.href
+                : null;
         });
 
         console.log("Next URL:", nextUrl);
 
-        if (!nextUrl)
+        if (!nextUrl) {
+            console.log(
+                "No next chapter found."
+            );
             break;
+        }
 
         currentUrl = nextUrl;
 
         await page.waitForTimeout(
-            2000 + Math.floor(Math.random() * 3000)
+            2000 +
+            Math.floor(
+                Math.random() * 3000
+            )
         );
     }
 
@@ -165,9 +217,9 @@ ${content}
         "utf8"
     );
 
-    await browser.close();
-
     console.log(
-        `Finished. Saved ${chapters.length} chapter(s).`
+        `Saved ${chapters.length} chapters`
     );
+
+    await browser.close();
 })();
