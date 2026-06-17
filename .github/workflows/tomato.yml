@@ -40,16 +40,21 @@ jobs:
           TOMATO_COOKIES: ${{ secrets.TOMATO_COOKIES }}
         run: node downloader.js
 
-      - name: Upload Novel
-        uses: actions/upload-artifact@v4
-        with:
-          name: novel
-          path: novel.txt
+            - name: Download Chapters
+        env:
+          START_URL: ${{ github.event.inputs.start_url }}
+          MAX_CHAPTERS: ${{ github.event.inputs.max_chapters }}
+          TOMATO_COOKIES: ${{ secrets.TOMATO_COOKIES }}
+        run: node downloader.js
+        continue-on-error: true
 
-      - name: Upload Debug Files
+      - name: Upload Everything
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: debug
           path: |
             *.png
             *.html
+            *.txt
+          if-no-files-found: ignore
